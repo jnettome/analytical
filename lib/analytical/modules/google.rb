@@ -27,6 +27,7 @@ module Analytical
             ga('create', '#{options[:key]}', 'auto', #{params});
             #{"ga('require', 'linkid', 'linkid.js');" if options[:enhanced_link_attribution]}
             #{"ga('require', 'ecommerce', 'ecommerce.js');" if options[:ecommerce]}
+            #{"ga('require', 'displayfeatures');" if options[:displayfeatures]}
           </script>
           HTML
           js
