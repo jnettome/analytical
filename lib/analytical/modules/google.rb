@@ -9,13 +9,12 @@ module Analytical
         @tracking_command_location = :head_append
       end
 
-      def print_options(options)
-        "{ #{"'cookieDomain': '#{options[:domain]}', " if options[:domain]}
+      def init_javascript(location)
+        params = "{
+          #{"'cookieDomain': '#{options[:domain]}', " if options[:domain]}
           'allowLinker': #{options[:allow_linker] ? true : false},
           'siteSpeedSampleRate': #{options[:sample_rate] || 0} }"
-      end
 
-      def init_javascript(location)
         init_location(location) do
           js = <<-HTML
           <!-- Analytical Init: Google -->
@@ -25,9 +24,9 @@ module Analytical
             m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
             })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 
-            ga('create', '#{options[:key]}', 'auto', #{print_options(options)});
+            ga('create', '#{options[:key]}', 'auto', #{params});
             #{"ga('require', 'linkid', 'linkid.js');" if options[:enhanced_link_attribution]}
-
+            #{"ga('require', 'ecommerce', 'ecommerce.js');" if options[:ecommerce]}
           </script>
           HTML
           js
@@ -45,48 +44,58 @@ module Analytical
         "ga('send', 'event', \"Event\", \"#{name}\"" + data_string + ");"
       end
 
-      # http://code.google.com/apis/analytics/docs/gaJS/gaJSApiEcommerce.html#_gat.GA_Tracker_._addTrans
-      # String orderId      Required. Internal unique order id number for this transaction.
-      # String affiliation  Optional. Partner or store affiliation (undefined if absent).
-      # String total        Required. Total dollar amount of the transaction.
-      # String tax          Optional. Tax amount of the transaction.
-      # String shipping     Optional. Shipping charge for the transaction.
-      # String city         Optional. City to associate with transaction.
-      # String state        Optional. State to associate with transaction.
-      # String country      Optional. Country to associate with transaction.
-      def add_trans(order_id, affiliation=nil, total=nil, tax=nil, shipping=nil, city=nil, state=nil, country=nil)
-        data = []
-        data << "'#{order_id}'"
-        data << "'#{affiliation}'"
-        data << "'#{total}'"
-        data << "'#{tax}'"
-        data << "'#{shipping}'"
-        data << "'#{city}'"
-        data << "'#{state}'"
-        data << "'#{country}'"
+      # Ecommerce Tracking related
+      # https://developers.google.com/analytics/devguides/collection/analyticsjs/ecommerce
 
-        "_gaq.push(['_addTrans', #{data.join(', ')}]);"
+      # Add a transaction
+      # String transaction_id Required Unique order id for this transaction
+      # String affilitiation  Required Affiliation or store name.
+      # String total          Required Grand Total.
+      # String shipping       Optional Shipping total.
+      # Float  tax            Optional Tax
+      # String currency       Optional Currency on 3 letter format (USD)
+      def add_transaction(transaction_id, total, affiliation = nil, tax = nil,
+                            shipping = nil, currency = nil)
+        "ga('ecommerce:addTransaction', {
+          'id': '#{transaction_id}',
+          'affiliation': '#{affiliation}',
+          'revenue': '#{total}',
+          'shipping': '#{shipping}',
+          'tax': '#{tax}',
+          'currency': '#{currency}'
+        });"
       end
 
-      # http://code.google.com/apis/analytics/docs/gaJS/gaJSApiEcommerce.html#_gat.GA_Tracker_._addItem
-      # String orderId  Optional Order ID of the transaction to associate with item.
-      # String sku      Required. Item's SKU code.
-      # String name     Required. Product name. Required to see data in the product detail report.
-      # String category Optional. Product category.
-      # String price    Required. Product price.
-      # String quantity Required. Purchase quantity.
-      def add_item(order_id, sku, name, category, price, quantity)
-        data  = "'#{order_id}', '#{sku}', '#{name}', '#{category}', '#{price}', '#{quantity}'"
-        "_gaq.push(['_addItem', #{data}]);"
+      # Add a item to your transaction (eg: shopping cart)
+      # String orderId  Required Transaction ID to associate with item.
+      # String name     Required Product name
+      # String sku      Optional Item's SKU code
+      # String category Optional Product category
+      # String price    Optional Product price
+      # String quantity Optional Purchase quantity
+      def add_item(transaction_id, name, sku = nil, category = nil,
+                    price = nil, quantity = nil)
+        "ga('ecommerce:addItem', {
+          'id': '#{transaction_id}',
+          'name': '#{name}',
+          'sku': '#{sku}',
+          'category': '#{category}',
+          'price': '#{price}',
+          'quantity': '#{quantity}'
+        });"
       end
 
-      # http://code.google.com/apis/analytics/docs/gaJS/gaJSApiEcommerce.html#_gat.GA_Tracker_._trackTrans
       # Sends both the transaction and item data to the Google Analytics server.
-      # This method should be used in conjunction with the add_item and add_trans methods.
-      def track_trans
-        "_gaq.push(['_trackTrans']);"
+      # This method should be used in conjunction with the add_item and
+      # add_trans methods.
+      def track_transaction
+        "ga('ecommerce:send');"
       end
 
+      # Clear current transaction
+      def clear_transaction
+        "ga('ecommerce:clear');"
+      end
     end
   end
 end
